@@ -1,12 +1,13 @@
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Button, Card, SectionTitle } from '../../components/ui';
 import { DEFAULT_CLEANUP_DAYS, getCleanupDays } from '../../lib/cleanup';
 import { getSetting, listEvents, setSetting } from '../../lib/db';
 import { confirm, showMessage } from '../../lib/dialog';
 import { formatBytes, shareTextFile, storageUsedBytes } from '../../lib/files';
 import { APP_VERSION, getDeviceId } from '../../lib/identity';
+import { getServerBase, setServerBase, testServer } from '../../lib/server';
 import { useSession } from '../../lib/session';
 import { syncNow } from '../../lib/sync';
 import { colors, space } from '../../lib/theme';
@@ -20,6 +21,8 @@ export default function Settings() {
   const [cleanupDays, setCleanupDays] = useState(DEFAULT_CLEANUP_DAYS);
   const [storage, setStorage] = useState(0);
   const [deviceId, setDeviceId] = useState('');
+  const [server, setServer] = useState('');
+  const [testing, setTesting] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -28,6 +31,7 @@ export default function Settings() {
         setCleanupDays(await getCleanupDays());
         setStorage(storageUsedBytes());
         setDeviceId(await getDeviceId());
+        setServer(await getServerBase());
       })();
     }, []),
   );
@@ -52,6 +56,15 @@ export default function Settings() {
     const next = CLEANUP_CHOICES[(CLEANUP_CHOICES.indexOf(cleanupDays) + 1) % CLEANUP_CHOICES.length] ?? DEFAULT_CLEANUP_DAYS;
     setCleanupDays(next);
     await setSetting('cleanup_days', String(next));
+  };
+
+  const saveServer = async () => {
+    setTesting(true);
+    const url = await setServerBase(server);
+    setServer(url);
+    const result = await testServer(url);
+    setTesting(false);
+    showMessage(result.ok ? 'Server saved' : 'Server not reachable', result.message);
   };
 
   const sendDiagnostics = async () => {
@@ -109,6 +122,23 @@ export default function Settings() {
         <Text style={styles.note}>Receipts that have not uploaded yet are never deleted.</Text>
       </Card>
 
+      <SectionTitle>Server</SectionTitle>
+      <Card style={styles.card}>
+        <Text style={styles.note}>Where receipts are read by AI and saved. Leave empty in a browser.</Text>
+        <TextInput
+          value={server}
+          onChangeText={setServer}
+          placeholder="http://192.168.1.10:8081"
+          placeholderTextColor={colors.faint}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="url"
+          accessibilityLabel="Server address"
+          style={styles.input}
+        />
+        <Button label="Save and test" icon="wifi" variant="secondary" busy={testing} onPress={() => void saveServer()} />
+      </Card>
+
       <SectionTitle>This phone</SectionTitle>
       <Card style={styles.card}>
         <Info label="Storage used" value={formatBytes(storage)} />
@@ -142,6 +172,7 @@ const styles = StyleSheet.create({
   label: { fontSize: 13, color: colors.muted },
   value: { fontSize: 22, fontWeight: '700', color: colors.text, marginTop: -space.sm },
   note: { fontSize: 13, color: colors.muted },
+  input: { borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingHorizontal: space.md, minHeight: 48, fontSize: 16, color: colors.text, backgroundColor: colors.bg },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md, minHeight: 40 },
   rowText: { flex: 1, fontSize: 15, color: colors.text },
   infoValue: { fontSize: 15, color: colors.muted },

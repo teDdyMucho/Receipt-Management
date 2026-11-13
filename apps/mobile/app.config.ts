@@ -29,6 +29,9 @@ const config: ExpoConfig = {
   web: { bundler: 'metro', output: 'server', favicon: './assets/favicon.png' },
   plugins: [
     'expo-router',
+    // Test builds talk to a computer on the local network over plain http.
+    // Remove usesCleartextTraffic once the server is hosted on https.
+    ['expo-build-properties', { android: { usesCleartextTraffic: true } }],
     'expo-sqlite',
     'expo-secure-store',
     'expo-sharing',

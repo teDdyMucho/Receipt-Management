@@ -2,7 +2,8 @@ import { hasExhaustedRetries, nextRetryAt } from '@lionrock/shared';
 import { Platform } from 'react-native';
 import { addEvent, getReceipt, listReceipts, updateSync } from './db';
 import { readReceiptBase64 } from './files';
-import { API_BASE_URL, APP_VERSION, getDeviceId } from './identity';
+import { APP_VERSION, getDeviceId } from './identity';
+import { getServerBase, serverProblem } from './server';
 
 // Sends receipts to the server. A receipt becomes Synced on this device only
 // after the server confirms it with the same checksum (spec 4.5).
@@ -30,7 +31,11 @@ export async function syncReceipt(clientUuid: string): Promise<boolean> {
     const base64 = await readReceiptBase64(receipt.local_path);
     if (!base64) throw new Error('The receipt file is missing on this device.');
 
-    const response = await fetch(`${API_BASE_URL}/api/receipts/save`, {
+    const server = await getServerBase();
+    const problem = await serverProblem(server);
+    if (problem) throw new Error(problem);
+
+    const response = await fetch(`${server}/api/receipts/save`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

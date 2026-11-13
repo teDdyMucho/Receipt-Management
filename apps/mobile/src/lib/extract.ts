@@ -1,7 +1,7 @@
 import type { ExtractedFields } from '@lionrock/shared';
 import { getReceipt, saveExtracted } from './db';
 import { readReceiptBase64 } from './files';
-import { API_BASE_URL } from './identity';
+import { getServerBase, serverProblem } from './server';
 
 // AI extraction (spec 4.9). Best effort: it never blocks saving, and if it
 // fails or takes over 20 seconds the wizard simply opens empty, with the reason shown.
@@ -26,7 +26,11 @@ export async function extractAndStore(clientUuid: string): Promise<ExtractOutcom
     const base64 = await readReceiptBase64(receipt.local_path);
     if (!base64) return { fields: null, reason: 'The receipt file is no longer on this device.' };
 
-    const response = await fetch(`${API_BASE_URL}/api/extract`, {
+    const server = await getServerBase();
+    const problem = await serverProblem(server);
+    if (problem) return { fields: null, reason: problem };
+
+    const response = await fetch(`${server}/api/extract`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contentType: receipt.content_type, base64 }),
