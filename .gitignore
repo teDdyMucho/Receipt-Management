@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.netlify/
+.expo/
+.env
+.env.local
+*.log
+apps/mobile/ios/
+apps/mobile/android/

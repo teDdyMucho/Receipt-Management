@@ -1,0 +1,24 @@
+{
+  "name": "lionrock-receipts",
+  "private": true,
+  "version": "0.1.0",
+  "description": "LionRock Receipts: Expo mobile app, web workspace and API",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "check:lines": "node scripts/check-file-length.mjs",
+    "mobile": "npm run start --workspace @lionrock/mobile",
+    "web": "npm run web --workspace @lionrock/mobile"
+  },
+  "overrides": {
+    "react": "19.3.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
