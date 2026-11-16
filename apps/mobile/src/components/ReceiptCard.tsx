@@ -3,17 +3,13 @@ import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { LocalReceipt } from '../lib/db';
 import { receiptFileUri } from '../lib/files';
+import { UPLOAD_BADGE, uploadState } from '../lib/status';
 import { colors, radius, shadow, space, typeColors } from '../lib/theme';
+import { openViewer } from '../lib/viewer';
+import { typeCardColour } from './TypeFilter';
 import { Button } from './ui';
 
 // One receipt in the Uploads list: thumbnail, fields, status badges and actions.
-
-const STATUS = {
-  pending: { label: 'Pending', color: colors.pending, bg: colors.pendingBg },
-  uploading: { label: 'Uploading', color: colors.uploading, bg: colors.uploadingBg },
-  synced: { label: 'Synced', color: colors.synced, bg: colors.syncedBg },
-  failed: { label: 'Failed', color: colors.failed, bg: colors.failedBg },
-} as const;
 
 export function Badge({ label, color, bg }: { label: string; color: string; bg: string }) {
   return (
@@ -24,7 +20,7 @@ export function Badge({ label, color, bg }: { label: string; color: string; bg: 
 }
 
 export function StatusBadges({ receipt }: { receipt: LocalReceipt }) {
-  const status = STATUS[receipt.sync_status];
+  const status = UPLOAD_BADGE[uploadState(receipt)];
   return (
     <View style={styles.badges}>
       <Badge {...status} />
@@ -50,23 +46,26 @@ export function ReceiptCard({ receipt, onOpen, onAddDetails, onRetry }: Props) {
   const taken = new Date(receipt.taken_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
 
   return (
-    // The card itself is not a button: the top row opens the receipt and the
-    // action buttons sit beside it, so no button is nested inside another.
-    <View style={[styles.card, { borderLeftColor: stripe }]}>
-      <Pressable
-        onPress={onOpen}
-        accessibilityRole="button"
-        accessibilityLabel="Open receipt"
-        style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
-      >
-        {uri && isImage ? (
-          <Image source={{ uri }} style={styles.thumb} accessibilityIgnoresInvertColors />
-        ) : (
-          <View style={[styles.thumb, styles.thumbEmpty]}>
-            <Text style={styles.thumbText}>{isImage ? 'Photo' : 'PDF'}</Text>
-          </View>
-        )}
-        <View style={styles.body}>
+    // The card itself is not a button. The picture opens the file full screen, the
+    // text opens the receipt, and the action buttons sit below, so no button is
+    // nested inside another.
+    <View style={[styles.card, { borderLeftColor: stripe, backgroundColor: typeCardColour(d.type) }]}>
+      <View style={styles.row}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="View the receipt full screen"
+          onPress={() => (uri ? openViewer({ title: receipt.file_name, contentType: receipt.content_type, uri, localPath: receipt.local_path }) : onOpen())}
+          style={({ pressed }) => pressed && { opacity: 0.7 }}
+        >
+          {uri && isImage ? (
+            <Image source={{ uri }} style={styles.thumb} accessibilityIgnoresInvertColors />
+          ) : (
+            <View style={[styles.thumb, styles.thumbEmpty]}>
+              <Text style={styles.thumbText}>{isImage ? 'Photo' : 'PDF'}</Text>
+            </View>
+          )}
+        </Pressable>
+        <Pressable onPress={onOpen} accessibilityRole="button" accessibilityLabel="Open receipt" style={({ pressed }) => [styles.body, pressed && { opacity: 0.7 }]}>
           <Text style={styles.title} numberOfLines={1}>
             {d.total ? `$${d.total.replace(/^\$/, '')}` : 'No total yet'}
             {d.type ? `  ·  ${typeLabel(d.type, d.type_other)}` : ''}
@@ -81,11 +80,11 @@ export function ReceiptCard({ receipt, onOpen, onAddDetails, onRetry }: Props) {
             </Text>
           )}
           <StatusBadges receipt={receipt} />
-        </View>
-      </Pressable>
-      {(receipt.sync_status === 'failed' || !receipt.details_confirmed) && (
+        </Pressable>
+      </View>
+      {(uploadState(receipt) === 'failed' || !receipt.details_confirmed) && (
         <View style={styles.actions}>
-          {receipt.sync_status === 'failed' && <Button label="Retry" size="small" variant="secondary" onPress={onRetry} />}
+          {uploadState(receipt) === 'failed' && <Button label="Retry" size="small" variant="secondary" onPress={onRetry} />}
           {!receipt.details_confirmed && <Button label="Add details" size="small" onPress={onAddDetails} />}
         </View>
       )}
@@ -103,7 +102,7 @@ const styles = StyleSheet.create({
     gap: space.md,
   },
   row: { flexDirection: 'row', gap: space.md },
-  thumb: { width: 64, height: 80, borderRadius: 10, backgroundColor: colors.bg },
+  thumb: { width: 64, height: 80, borderRadius: 10, backgroundColor: colors.card },
   thumbEmpty: { alignItems: 'center', justifyContent: 'center' },
   thumbText: { color: colors.muted, fontSize: 12, fontWeight: '600' },
   body: { flex: 1, gap: 2 },

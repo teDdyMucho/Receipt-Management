@@ -39,7 +39,7 @@ const MAX_BYTES = 8 * 1024 * 1024;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** True only for a real service-role key. The anon key pasted into the wrong line is not one. */
-function isServiceRoleKey(key: string): boolean {
+export function isServiceRoleKey(key: string): boolean {
   if (key.startsWith('sb_secret_')) return true;
   try {
     const payload = JSON.parse(atob((key.split('.')[1] ?? '').replace(/-/g, '+').replace(/_/g, '/'))) as { role?: string };

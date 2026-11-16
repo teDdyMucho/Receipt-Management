@@ -51,15 +51,15 @@ export function Button({ label, onPress, variant = 'primary', size = 'normal', i
   );
 }
 
-export function Chip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+export function Chip({ label, selected, onPress, small }: { label: string; selected: boolean; onPress: () => void; small?: boolean }) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected }}
       onPress={onPress}
-      style={[styles.chip, selected && styles.chipSelected]}
+      style={[styles.chip, small && styles.chipSmall, selected && styles.chipSelected]}
     >
-      <Text style={[styles.chipText, selected && { color: colors.primaryText }]}>{label}</Text>
+      <Text style={[styles.chipText, small && { fontSize: 12 }, selected && { color: colors.primaryText }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -119,6 +119,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  chipSmall: { paddingHorizontal: space.sm, minHeight: 32, borderRadius: 16 },
   chipSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { fontSize: 14, fontWeight: '600', color: colors.text },
   card: { backgroundColor: colors.card, borderRadius: radius, padding: space.lg, ...shadow },

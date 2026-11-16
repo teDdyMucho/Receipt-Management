@@ -1,7 +1,8 @@
-import { API_BASE_URL } from './identity';
+import type { ReceiptDetails } from '@lionrock/shared';
+import { SERVER_HEADERS, getServerBase, serverProblem, sessionHeaders } from './server';
 
-// The only place the app talks to the network. It calls our API and nothing
-// else: no Supabase key and no n8n URL exist in this app.
+// Sign in, profile and reading receipts back from the server. The app calls our
+// own server and nothing else: no Supabase key and no n8n URL exist in this app.
 
 export class ApiError extends Error {
   constructor(
@@ -13,68 +14,121 @@ export class ApiError extends Error {
   }
 }
 
-export const hasApi = API_BASE_URL.length > 0;
+const OFFLINE = 'Could not reach the server. Check your connection and try again.';
 
-async function post<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  const data = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
-  if (!res.ok) {
-    throw new ApiError(data.error ?? `Request failed (${res.status})`, res.status, data.code ?? 'unknown');
+async function call<T>(path: string, options: { body?: unknown; signedIn?: boolean } = {}): Promise<T> {
+  const base = await getServerBase();
+  const problem = await serverProblem(base);
+  if (problem) throw new ApiError(problem, 0, 'no_server');
+
+  let res: Response;
+  try {
+    res = await fetch(`${base}${path}`, {
+      method: options.body === undefined ? 'GET' : 'POST',
+      headers: options.signedIn ? await sessionHeaders() : SERVER_HEADERS,
+      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    });
+  } catch {
+    throw new ApiError(OFFLINE, 0, 'offline');
   }
+  if (!(res.headers.get('content-type') ?? '').includes('application/json')) {
+    throw new ApiError('The server is not answering. Try again in a moment.', res.status, 'not_json');
+  }
+  const data = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+  if (!res.ok) throw new ApiError(data.error ?? `Request failed (${res.status})`, res.status, data.code ?? 'unknown');
   return data as T;
 }
 
-export type VerifyResult =
-  | { ok: true; displayName: string; verified: boolean }
-  | { ok: false; message: string };
+/** The message to show for any failed call. */
+export const errorText = (e: unknown) => (e instanceof Error ? e.message : 'Something went wrong.');
 
-/**
- * Checks an access NAME with the server. Without an API configured (local
- * testing) the name is accepted as typed and marked unverified.
- */
-export async function verifyAccessName(name: string): Promise<VerifyResult> {
-  if (!hasApi) return { ok: true, displayName: name, verified: false };
-  try {
-    const data = await post<{ ok: boolean; display_name: string }>('/api/access/verify', { name });
-    return { ok: true, displayName: data.display_name || name, verified: true };
-  } catch (e) {
-    if (e instanceof ApiError && e.status === 410) {
-      return { ok: false, message: 'This access name is no longer active' };
-    }
-    if (e instanceof ApiError && e.status === 404) {
-      return { ok: false, message: 'We could not find that access name. Check the spelling.' };
-    }
-    return { ok: false, message: 'Could not reach the server. Check your connection and try again.' };
-  }
+export interface SignedIn {
+  name: string;
+  token: string;
+  profile_image?: string | null;
+  role?: string;
 }
 
-/** Sample staff account for the preview (no server). Not a real account. */
-export const DEMO_STAFF = { email: 'demo@lionrock.test', password: 'demo1234', name: 'Demo Staff' };
+export const checkAccessName = (name: string) =>
+  call<{ name: string; status: 'available' | 'taken' | 'disabled' }>('/api/access/check', { body: { name } });
 
-export type LoginResult = { ok: true; name: string; token: string } | { ok: false; message: string };
+export const claimAccessName = (name: string, pin: string) => call<SignedIn>('/api/access/claim', { body: { name, pin } });
 
-export async function staffLogin(email: string, password: string): Promise<LoginResult> {
-  // Preview only: with no API configured there is no server to check a password,
-  // so one sample account is accepted. A build with an API URL never reaches this.
-  if (!hasApi) {
-    if (email.toLowerCase() === DEMO_STAFF.email && password === DEMO_STAFF.password) {
-      return { ok: true, name: DEMO_STAFF.name, token: '' };
-    }
-    return { ok: false, message: 'Invalid email or password' };
-  }
-  try {
-    const data = await post<{ token: string; user: { name: string } }>('/api/auth/login', {
-      email,
-      password,
-      client: 'mobile',
-    });
-    return { ok: true, name: data.user.name, token: data.token };
-  } catch (e) {
-    if (e instanceof ApiError && e.status === 401) return { ok: false, message: 'Invalid email or password' };
-    return { ok: false, message: 'Could not reach the server. Check your connection and try again.' };
-  }
+export const loginAccessName = (name: string, pin: string) => call<SignedIn>('/api/access/login', { body: { name, pin } });
+
+export const staffLogin = (email: string, password: string) => call<SignedIn>('/api/auth/login', { body: { email, password } });
+
+export const getProfile = () =>
+  call<{ name: string; profile_image: string | null; created_at: string }>('/api/access/profile', { signedIn: true });
+
+export const setProfileImage = (profile_image: string | null) =>
+  call<{ profile_image: string | null }>('/api/access/profile', { body: { profile_image }, signedIn: true });
+
+export const changePin = (current_pin: string, new_pin: string) =>
+  call<{ ok: boolean }>('/api/access/pin', { body: { current_pin, new_pin }, signedIn: true });
+
+export interface StaffAccount {
+  id: string;
+  email: string;
+  user_name: string | null;
+  role: string | null;
+  created_at: string;
 }
+
+// Admin only. The server refuses these for anyone else.
+export const listStaff = () => call<{ staff: StaffAccount[] }>('/api/staff/list', { signedIn: true });
+
+export const createStaff = (account: { email: string; name: string; password: string; role: 'user' | 'admin' }) =>
+  call<{ id: string }>('/api/staff/create', { body: account, signedIn: true });
+
+export const setStaffPassword = (id: string, password: string) =>
+  call<{ ok: boolean }>('/api/staff/password', { body: { id, password }, signedIn: true });
+
+export interface RemoteReceipt {
+  id: string;
+  client_uuid: string | null;
+  user: string | null;
+  created_at: string;
+  receipt_date: string | null;
+  total: string | null;
+  work_order: string | null;
+  tenant_address: string | null;
+  type: string | null;
+  type_other: string | null;
+  details_confirmed: boolean | null;
+  content_type: string | null;
+}
+
+export interface Person {
+  name: string;
+  receipts: number;
+  profile_image: string | null;
+}
+
+export const listRemoteReceipts = (person?: string | null) =>
+  call<{ receipts: RemoteReceipt[]; people: Person[] }>(`/api/receipts/list${person ? `?person=${encodeURIComponent(person)}` : ''}`, { signedIn: true });
+
+/** Staff and admins: correct the details of any receipt. */
+export const updateRemoteReceipt = (id: string, details: ReceiptDetails) =>
+  call<{ ok: boolean; changed: number }>('/api/receipts/update', { body: { id, details }, signedIn: true });
+
+/** Removes the receipt from the app for everyone. */
+export const deleteRemoteReceipt = (id: string) => call<{ ok: boolean }>('/api/receipts/delete', { body: { id }, signedIn: true });
+
+export interface AuditEntry {
+  id: string;
+  at: string;
+  actor: string;
+  actor_kind: string;
+  action: 'upload' | 'edit' | 'delete';
+  receipt_id: string | null;
+  receipt_owner: string | null;
+  summary: string | null;
+  changes: Record<string, { from: string | null; to: string | null }> | null;
+}
+
+/** Admin only. */
+export const listAudit = () => call<{ entries: AuditEntry[] }>('/api/audit/list', { signedIn: true });
+
+export const receiptFileUrl =(id: string) =>
+  call<{ url: string; content_type: string | null }>(`/api/receipts/file?id=${encodeURIComponent(id)}`, { signedIn: true });

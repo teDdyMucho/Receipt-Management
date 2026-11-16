@@ -12,11 +12,13 @@
     "preview": {
       "distribution": "internal",
       "environment": "preview",
+      "env": { "EXPO_PUBLIC_DEFAULT_SERVER_URL": "https://lionrock-receipts.expo.app" },
       "android": { "buildType": "apk" }
     },
     "production": {
       "autoIncrement": true,
-      "environment": "production"
+      "environment": "production",
+      "env": { "EXPO_PUBLIC_DEFAULT_SERVER_URL": "https://lionrock-receipts.expo.app" }
     }
   },
   "submit": {

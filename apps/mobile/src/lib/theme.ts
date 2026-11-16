@@ -35,7 +35,15 @@ export const typeColors = {
   slate: '#64748B',
 } as const;
 
-export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
+/** Soft colours per receipt Type, the same ones the office screen uses for its rows and filters. */
+export const typeTints = {
+  emerald: { bg: '#D1FAE5', border: '#6EE7B7', text: '#047857', solid: '#10B981' },
+  amber: { bg: '#FEF3C7', border: '#FCD34D', text: '#92400E', solid: '#D97706' },
+  indigo: { bg: '#E0E7FF', border: '#A5B4FC', text: '#3730A3', solid: '#4F46E5' },
+  slate: { bg: '#F1F5F9', border: '#CBD5E1', text: '#334155', solid: '#64748B' },
+} as const;
+
+export const space ={ xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
 export const radius = 16;
 export const radiusSmall = 10;
 

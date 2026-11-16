@@ -32,14 +32,26 @@ export function LoadingOverlay({ visible, title, steps, current, progress }: Pro
     return () => loop.stop();
   }, [visible, pulse]);
 
-  const target = progress ?? (steps.length > 0 ? (current + 0.6) / steps.length : 0);
+  // The bar never stands still: it jumps to the start of the current step, then keeps
+  // creeping towards the end of that step, so the last step runs almost to the end.
+  const count = Math.max(1, steps.length);
+  const stepStart = Math.min(1, (current + 0.25) / count);
+  const stepEnd = Math.min(1, (current + 0.97) / count);
   useEffect(() => {
     if (!visible) {
       bar.setValue(0);
       return;
     }
-    Animated.timing(bar, { toValue: Math.min(1, target), duration: 350, easing: Easing.out(Easing.quad), useNativeDriver: false }).start();
-  }, [visible, target, bar]);
+    const moving =
+      progress !== undefined
+        ? Animated.timing(bar, { toValue: Math.min(1, progress), duration: 350, easing: Easing.out(Easing.quad), useNativeDriver: false })
+        : Animated.sequence([
+            Animated.timing(bar, { toValue: stepStart, duration: 350, easing: Easing.out(Easing.quad), useNativeDriver: false }),
+            Animated.timing(bar, { toValue: stepEnd, duration: 9000, easing: Easing.out(Easing.cubic), useNativeDriver: false }),
+          ]);
+    moving.start();
+    return () => moving.stop();
+  }, [visible, progress, stepStart, stepEnd, bar]);
 
   const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
   const width = bar.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });

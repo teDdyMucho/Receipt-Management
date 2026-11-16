@@ -1,6 +1,7 @@
 import NetInfo from '@react-native-community/netinfo';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { getDb, listReceipts, subscribe, type LocalReceipt } from './db';
+import { removeUploadedCopies } from './sync';
+import { getDb,listReceipts, subscribe, type LocalReceipt } from './db';
 import { clearIdentity, loadIdentity, saveIdentity, type Identity } from './identity';
 
 // App-wide state: who is scanning, whether the phone is online, and the
@@ -47,6 +48,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     void refresh();
     return subscribe(() => void refresh());
   }, [refresh]);
+
+  // Uploaded receipts are not kept on the phone. This clears any left by an older version.
+  useEffect(() => {
+    if (name) void removeUploadedCopies(name).catch(() => undefined);
+  }, [name]);
 
   const setIdentity = useCallback(async (next: Identity) => {
     await saveIdentity(next);

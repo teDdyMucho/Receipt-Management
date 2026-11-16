@@ -6,7 +6,9 @@ import { ActivityIndicator, View } from 'react-native';
 import { useSession } from '../../lib/session';
 import { colors } from '../../lib/theme';
 
-// The three screens every identity sees: Scan, Uploads, Settings.
+// A link name sees Scan, History and Settings (its own profile).
+// For staff, History shows the receipts of every person who uses the app,
+// and an admin also sees Staff (staff accounts).
 export default function TabsLayout() {
   const { loading, identity, receipts } = useSession();
 
@@ -41,9 +43,27 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="uploads"
         options={{
-          title: 'Uploads',
+          title: 'History',
           tabBarBadge: waiting > 0 ? waiting : undefined,
-          tabBarIcon: ({ focused, size }) => <Ionicons name="cloud-upload" color={focused ? colors.primary : colors.muted} size={size} />,
+          tabBarIcon: ({ focused, size }) => <Ionicons name="time" color={focused ? colors.primary : colors.muted} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="staff"
+        options={{
+          title: 'Staff',
+          // Admin only: make staff accounts. The server refuses everyone else.
+          href: identity.kind === 'staff' && identity.role === 'admin' ? undefined : null,
+          tabBarIcon: ({ focused, size }) => <Ionicons name="person-add" color={focused ? colors.primary : colors.muted} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="audit"
+        options={{
+          title: 'Audit',
+          // Admin only: who uploaded, edited or deleted. The server refuses everyone else.
+          href: identity.kind === 'staff' && identity.role === 'admin' ? undefined : null,
+          tabBarIcon: ({ focused, size }) => <Ionicons name="list" color={focused ? colors.primary : colors.muted} size={size} />,
         }}
       />
       <Tabs.Screen

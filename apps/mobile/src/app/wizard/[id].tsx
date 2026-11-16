@@ -5,12 +5,15 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button, Chip } from '../../components/ui';
 import { LoadingOverlay } from '../../components/LoadingOverlay';
+import { UploadResult } from '../../components/UploadResult';
 import { getReceipt, saveDetails } from '../../lib/db';
 import { extractAndStore } from '../../lib/extract';
 import { syncReceipt } from '../../lib/sync';
 import { colors, radius, space } from '../../lib/theme';
 
 // Receipt Data wizard (spec 8.4): one field per step, Back / Next / Done, plus Later.
+// Done uploads the receipt and then shows the result: Success or Failed.
+const UPLOAD_STEPS = ['Sending the receipt', 'Saving it in the office database'];
 type TypeKey = 'renovation' | 'turn_over' | 'work_order' | 'other';
 type Step = 'type' | 'date' | 'total' | 'work_order' | 'address' | 'review';
 
@@ -47,6 +50,8 @@ export default function Wizard() {
   const [reading, setReading] = useState(false);
   const [aiNote, setAiNote] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [uploading, setUploading] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; error: string | null } | null>(null);
 
   // Pre-fill from saved details first, then from AI extraction. A receipt that
   // has not been read by AI yet is read here, whichever way the wizard was opened.
@@ -130,8 +135,15 @@ export default function Wizard() {
   const done = async () => {
     if (stepError.review) return setError(stepError.review ?? null);
     await saveDetails(id, details(), true);
-    void syncReceipt(id);
-    router.back();
+    await upload();
+  };
+  // Sends the receipt now and waits for the answer: Success or Failed, nothing in between.
+  const upload = async () => {
+    setUploading(true);
+    const ok = await syncReceipt(id);
+    const after = await getReceipt(id);
+    setUploading(false);
+    setResult({ ok: ok || after?.sync_status === 'synced', error: after?.last_error ?? null });
   };
   // Later keeps whatever was typed, unconfirmed. The file upload never waits for this.
   const later = async () => {
@@ -141,6 +153,15 @@ export default function Wizard() {
   };
 
   const aiHint = (key: string) => (suggested.has(key) ? <Text style={styles.ai}>Suggested by AI</Text> : null);
+
+  if (result) {
+    return (
+      <>
+        <UploadResult ok={result.ok} error={result.error} busy={uploading} onRetry={() => void upload()} onClose={() => router.back()} />
+        <LoadingOverlay visible={uploading} title="Uploading your receipt" steps={UPLOAD_STEPS} current={0} />
+      </>
+    );
+  }
 
   if (!loaded) {
     return (
@@ -152,6 +173,7 @@ export default function Wizard() {
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.screen}>
+      <LoadingOverlay visible={uploading} title="Uploading your receipt" steps={UPLOAD_STEPS} current={0} />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {!!aiNote && (
           <View style={styles.aiNote} accessibilityRole="alert">

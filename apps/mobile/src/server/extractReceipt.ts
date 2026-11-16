@@ -93,11 +93,14 @@ export async function extractReceipt(contentType: string, base64: string): Promi
       ? { type: 'file', file: { filename: 'receipt.pdf', file_data: dataUrl } }
       : { type: 'image_url', image_url: { url: dataUrl, detail: 'high' } };
 
+  const model = process.env.OPENAI_MODEL || 'gpt-4o';
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
-      model: process.env.OPENAI_MODEL || 'gpt-4o',
+      model,
+      // Reasoning models think for a long time by default; reading a receipt does not need it.
+      ...(/^(gpt-5|o\d)/.test(model) ? { reasoning_effort: 'low' } : {}),
       response_format: { type: 'json_object' },
       messages: [
         {

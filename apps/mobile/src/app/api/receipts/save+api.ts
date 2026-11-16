@@ -1,18 +1,23 @@
-import { rejectWithoutAppKey } from '../../../server/guard';
+import { HttpError, readJson, route } from '../../../server/http';
+import { auditUpload } from '../../../server/receiptAdmin';
 import { SaveError, saveReceipt, type SaveReceiptInput } from '../../../server/saveReceipt';
+import { requireSession } from '../../../server/session';
 
 // POST /api/receipts/save  -> { client_uuid, receipt_id, checksum, status: "synced" }
 // Runs on the server. Confirms only after the file and the row are both saved.
-export async function POST(request: Request): Promise<Response> {
-  const rejected = rejectWithoutAppKey(request);
-  if (rejected) return rejected;
-  try {
-    const body = (await request.json().catch(() => null)) as SaveReceiptInput | null;
-    if (!body) return Response.json({ error: 'A JSON body is required.', code: 'bad_request' }, { status: 400 });
-    return Response.json(await saveReceipt(body));
-  } catch (e) {
-    if (e instanceof SaveError) return Response.json({ error: e.message, code: e.code }, { status: e.status });
-    console.error('[save] unexpected error', e);
-    return Response.json({ error: 'The receipt could not be saved.', code: 'server_error' }, { status: 500 });
+export const POST = route(async (request) => {
+  const user = await requireSession(request);
+  const body = (await readJson<SaveReceiptInput>(request)) as SaveReceiptInput;
+  // The receipt is saved under the signed-in name, never under a name the app sends.
+  if (body.identity && body.identity.trim().toLowerCase() !== user.name.toLowerCase()) {
+    throw new HttpError(`This receipt belongs to "${body.identity}". Sign in with that name to upload it.`, 403, 'wrong_identity');
   }
-}
+  try {
+    const saved = await saveReceipt({ ...body, identity: user.name });
+    await auditUpload(user, saved.receipt_id, body.details);
+    return saved;
+  } catch (e) {
+    if (e instanceof SaveError) throw new HttpError(e.message, e.status, e.code);
+    throw e;
+  }
+});

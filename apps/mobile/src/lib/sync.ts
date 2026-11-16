@@ -1,16 +1,14 @@
 import { hasExhaustedRetries, nextRetryAt } from '@lionrock/shared';
 import { Platform } from 'react-native';
-import { addEvent, getReceipt, listReceipts, updateSync } from './db';
-import { readReceiptBase64 } from './files';
+import { addEvent, deleteReceiptRow, getReceipt, listReceipts, updateSync } from './db';
+import { deleteReceiptFile, readReceiptBase64 } from './files';
 import { APP_VERSION, getDeviceId } from './identity';
-import { SERVER_HEADERS, getServerBase, serverProblem } from './server';
+import { getServerBase, serverProblem, sessionHeaders } from './server';
 
-// Sends receipts to the server. A receipt becomes Synced on this device only
-// after the server confirms it with the same checksum (spec 4.5).
-//
-// This is the direct path: it runs after the wizard and on "Sync now". The
-// background queue (uploads while the app is closed, automatic timed retries)
-// is Phase 3.
+// Sends receipts to the server. The phone only holds a receipt until the server
+// confirms it with the same checksum; after that the copy on the phone is removed
+// and the receipt lives in the office database and cloud storage only.
+// A receipt that fails to upload stays on the phone so it can be tried again.
 
 export interface SyncResult {
   started: boolean;
@@ -18,6 +16,18 @@ export interface SyncResult {
 }
 
 const inFlight = new Set<string>();
+
+async function removeLocalCopy(receipt: { client_uuid: string; local_path: string | null }): Promise<void> {
+  deleteReceiptFile(receipt.local_path);
+  await deleteReceiptRow(receipt.client_uuid);
+}
+
+/** Clears receipts left on the phone by an older version that kept uploaded copies. */
+export async function removeUploadedCopies(identity: string): Promise<void> {
+  for (const receipt of await listReceipts(identity)) {
+    if (receipt.sync_status === 'synced') await removeLocalCopy(receipt);
+  }
+}
 
 /** Uploads one receipt. Returns true when the server confirmed it. */
 export async function syncReceipt(clientUuid: string): Promise<boolean> {
@@ -37,7 +47,7 @@ export async function syncReceipt(clientUuid: string): Promise<boolean> {
 
     const response = await fetch(`${server}/api/receipts/save`, {
       method: 'POST',
-      headers: SERVER_HEADERS,
+      headers: await sessionHeaders(),
       body: JSON.stringify({
         client_uuid: receipt.client_uuid,
         identity: receipt.identity,
@@ -64,15 +74,9 @@ export async function syncReceipt(clientUuid: string): Promise<boolean> {
       throw new Error('The server did not confirm the receipt.');
     }
 
-    await updateSync(clientUuid, {
-      sync_status: 'synced',
-      registered: true,
-      server_receipt_id: data.receipt_id ?? null,
-      synced_at: new Date().toISOString(),
-      last_error: null,
-      next_retry_at: null,
-    });
-    await addEvent(clientUuid, 'On server');
+    // The server confirmed it with the same checksum, so the office database and
+    // cloud storage now hold the receipt. Nothing is kept on the phone after that.
+    await removeLocalCopy(receipt);
     return true;
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Upload failed';

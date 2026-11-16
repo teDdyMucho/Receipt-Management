@@ -1,14 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import { router } from 'expo-router';
-import React, { useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LoadingOverlay } from '../../components/LoadingOverlay';
 import { Button, Card, OfflineBanner, type IconName } from '../../components/ui';
 import { SAVE_STEPS, saveReceiptLocally, type PickedFile } from '../../lib/capture';
+import { takeCaptured } from '../../lib/captured';
 import { confirm, showMessage } from '../../lib/dialog';
 import { useSession } from '../../lib/session';
+import { uploadState } from '../../lib/status';
 import { colors, radius, shadow, space, type } from '../../lib/theme';
 
 // Scan (spec 8.3): take a picture, choose from the library or pick a PDF,
@@ -28,6 +30,29 @@ export default function Scan() {
 
   const waiting = receipts.filter((r) => r.sync_status !== 'synced').length;
 
+  // What happened to the receipt just scanned: Success, Failed, or not sent yet.
+  const saved = savedId ? receipts.find((r) => r.client_uuid === savedId) : undefined;
+  // An uploaded receipt is removed from the phone, so "not here any more" means it went through.
+  const savedState = saved ? uploadState(saved) : 'success';
+  const outcome: { title: string; text: string; icon: IconName; color: string; bg: string } =
+    savedState === 'success'
+      ? { title: 'Success', text: 'The receipt was uploaded to the office.', icon: 'checkmark-circle', color: colors.synced, bg: colors.syncedBg }
+      : savedState === 'failed'
+        ? {
+            title: 'Failed',
+            text: `The receipt was NOT uploaded. It is still on this phone.${saved?.last_error ? ` ${saved.last_error}` : ''}`,
+            icon: 'close-circle',
+            color: colors.failed,
+            bg: colors.failedBg,
+          }
+        : {
+            title: 'Not uploaded yet',
+            text: online ? 'Finish the details to upload it to the office.' : 'There is no connection. It is saved on this phone; upload it when you are back online.',
+            icon: 'time',
+            color: colors.pending,
+            bg: colors.pendingBg,
+          };
+
   const reset = () => {
     setPicked(null);
     setRotation(0);
@@ -37,23 +62,26 @@ export default function Scan() {
   const permissionDenied = async (what: string) => {
     const open = await confirm({
       title: `${what} access is off`,
-      message: `Turn on ${what.toLowerCase()} access for Receipts in Settings.`,
+      message: `Turn on ${what.toLowerCase()} access for Lionrock in Settings.`,
       confirmLabel: 'Open Settings',
     });
     if (open) void Linking.openSettings();
   };
 
-  // Permissions are asked only here, the first time the user taps the button.
-  const takePicture = async () => {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) return permissionDenied('Camera');
-    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], allowsEditing: true, quality: 1 });
-    const asset = result.assets?.[0];
-    if (asset) {
-      reset();
-      setPicked({ uri: asset.uri, kind: 'image', width: asset.width, height: asset.height, fromCamera: true });
-    }
-  };
+  // Opens the app's own camera screen (shutter only, then X or check). It asks for
+  // the camera permission itself, the first time.
+  const takePicture = () => router.push('/camera');
+
+  // Back from the camera with a picture the person accepted.
+  useFocusEffect(
+    useCallback(() => {
+      const shot = takeCaptured();
+      if (!shot) return;
+      setRotation(0);
+      setSavedId(null);
+      setPicked({ uri: shot.uri, kind: 'image', width: shot.width, height: shot.height, fromCamera: true });
+    }, []),
+  );
 
   const chooseFromLibrary = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, quality: 1 });
@@ -82,6 +110,9 @@ export default function Scan() {
       const id = await saveReceiptLocally(picked, identity.name, rotation, setStep);
       const remaining = MIN_LOADING_MS - (Date.now() - started);
       if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
+      // All steps done: let the bar run to the very end before the screen changes.
+      setStep(SAVE_STEPS.length);
+      await new Promise((resolve) => setTimeout(resolve, 450));
       setSavedId(id);
       setSaving(false);
       router.push({ pathname: '/wizard/[id]', params: { id } });
@@ -154,18 +185,22 @@ export default function Scan() {
 
           {savedId ? (
             <>
-              <Card style={styles.status}>
-                <Ionicons name="checkmark-circle" size={30} color={colors.synced} />
+              <Card style={[styles.status, { backgroundColor: outcome.bg }]}>
+                <Ionicons name={outcome.icon} size={30} color={outcome.color} />
                 <View style={styles.heroText}>
-                  <Text style={styles.statusTitle}>Saved on this phone</Text>
-                  <Text style={styles.statusText}>
-                    {online
-                      ? 'It is in your Uploads list and goes to the office after you finish the details.'
-                      : 'It will upload automatically when the connection is back.'}
-                  </Text>
+                  <Text style={styles.statusTitle}>{outcome.title}</Text>
+                  <Text style={styles.statusText}>{outcome.text}</Text>
                 </View>
               </Card>
-              <Button label="Scan another receipt" size="large" icon="camera" onPress={reset} />
+              {savedState !== 'success' && (
+                <Button
+                  label={savedState === 'failed' ? 'Try again' : 'Add details and upload'}
+                  size="large"
+                  icon={savedState === 'failed' ? 'refresh' : 'create-outline'}
+                  onPress={() => router.push({ pathname: '/wizard/[id]', params: { id: savedId } })}
+                />
+              )}
+              <Button label="Scan another receipt" size="large" icon="camera" variant={savedState === 'success' ? 'primary' : 'secondary'} onPress={reset} />
             </>
           ) : (
             <>

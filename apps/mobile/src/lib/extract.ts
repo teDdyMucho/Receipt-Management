@@ -1,12 +1,13 @@
 import type { ExtractedFields } from '@lionrock/shared';
 import { getReceipt, saveExtracted } from './db';
 import { readReceiptBase64 } from './files';
-import { SERVER_HEADERS, getServerBase, serverProblem } from './server';
+import { getServerBase, serverProblem, sessionHeaders } from './server';
 
 // AI extraction (spec 4.9). Best effort: it never blocks saving, and if it
 // fails or takes over 20 seconds the wizard simply opens empty, with the reason shown.
 
-const TIMEOUT_MS = 20_000;
+// The first request after a quiet period is slower while the hosted server wakes up.
+const TIMEOUT_MS = 45_000;
 const EMPTY: ExtractedFields = { receipt_date: null, total: null, work_order: null, tenant_address: null };
 
 export interface ExtractOutcome {
@@ -32,7 +33,7 @@ export async function extractAndStore(clientUuid: string): Promise<ExtractOutcom
 
     const response = await fetch(`${server}/api/extract`, {
       method: 'POST',
-      headers: SERVER_HEADERS,
+      headers: await sessionHeaders(),
       body: JSON.stringify({ contentType: receipt.content_type, base64 }),
       signal: controller.signal,
     });

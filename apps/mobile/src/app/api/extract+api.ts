@@ -1,24 +1,17 @@
 import { ExtractError, extractReceipt } from '../../server/extractReceipt';
-import { rejectWithoutAppKey } from '../../server/guard';
+import { HttpError, readJson, route } from '../../server/http';
+import { requireSession } from '../../server/session';
 
 // POST /api/extract  { contentType, base64 }  ->  { extracted_fields }
-// Runs on the server (never in the app bundle). In production this moves behind
-// the identity check as POST /api/receipts/{client_uuid}/extract.
-export async function POST(request: Request): Promise<Response> {
-  const rejected = rejectWithoutAppKey(request);
-  if (rejected) return rejected;
+// Runs on the server (never in the app bundle). Only for someone who is signed in.
+export const POST = route(async (request) => {
+  await requireSession(request);
+  const body = await readJson<{ contentType: string; base64: string }>(request);
+  if (!body.contentType || !body.base64) throw new HttpError('contentType and base64 are required.', 400, 'bad_request');
   try {
-    const body = (await request.json().catch(() => null)) as { contentType?: string; base64?: string } | null;
-    if (!body?.contentType || !body.base64) {
-      return Response.json({ error: 'contentType and base64 are required.', code: 'bad_request' }, { status: 400 });
-    }
-    const fields = await extractReceipt(body.contentType, body.base64);
-    return Response.json({ extracted_fields: fields });
+    return { extracted_fields: await extractReceipt(body.contentType, body.base64) };
   } catch (e) {
-    if (e instanceof ExtractError) {
-      return Response.json({ error: e.message, code: e.code }, { status: e.status });
-    }
-    console.error('[extract] unexpected error', e);
-    return Response.json({ error: 'Extraction failed.', code: 'server_error' }, { status: 500 });
+    if (e instanceof ExtractError) throw new HttpError(e.message, e.status, e.code);
+    throw e;
   }
-}
+});

@@ -2,21 +2,23 @@ import type { ExpoConfig } from 'expo/config';
 
 // Public values only. The app holds no Supabase key; it talks to our API.
 const config: ExpoConfig = {
-  name: 'Receipts',
+  name: 'Lionrock',
   slug: 'lionrock-receipts',
-  version: '1.0.0',
+  // 2.0.0: the version with PIN sign in, cloud history, staff accounts and the audit log.
+  version: '2.0.0',
   orientation: 'portrait',
   icon: './assets/icon.png',
   userInterfaceStyle: 'light',
   scheme: 'lionrockreceipts',
   ios: {
     supportsTablet: true,
+    // The app that already exists in App Store Connect under this id (the first build was submitted to it).
     bundleIdentifier: 'com.lionrock.receipts',
     infoPlist: {
       // The app uses only standard https encryption, so no export paperwork is needed.
       ITSAppUsesNonExemptEncryption: false,
-      NSCameraUsageDescription: 'Receipts uses the camera to photograph receipts for upload.',
-      NSPhotoLibraryUsageDescription: 'Receipts uses your photo library so you can choose a receipt photo to upload.',
+      NSCameraUsageDescription: 'Lionrock uses the camera to photograph receipts for upload.',
+      NSPhotoLibraryUsageDescription: 'Lionrock uses your photo library so you can choose a receipt photo to upload.',
     },
   },
   android: {
@@ -30,10 +32,10 @@ const config: ExpoConfig = {
   },
   web: { bundler: 'metro', output: 'server', favicon: './assets/favicon.png' },
   plugins: [
-    'expo-router',
-    // Test builds talk to a computer on the local network over plain http.
-    // Remove usesCleartextTraffic once the server is hosted on https.
-    ['expo-build-properties', { android: { usesCleartextTraffic: true } }],
+    // asyncRoutes off: with it on, the development server loads each tab the first time it is
+    // opened and shows a black "Bundling..." box at the bottom of the screen while it does.
+    ['expo-router', { asyncRoutes: false }],
+    ['expo-camera', { cameraPermission: 'Lionrock uses the camera to photograph receipts for upload.', recordAudioAndroid: false }],
     'expo-sqlite',
     'expo-secure-store',
     'expo-sharing',
@@ -41,8 +43,8 @@ const config: ExpoConfig = {
     [
       'expo-image-picker',
       {
-        cameraPermission: 'Receipts uses the camera to photograph receipts for upload.',
-        photosPermission: 'Receipts uses your photo library so you can choose a receipt photo to upload.',
+        cameraPermission: 'Lionrock uses the camera to photograph receipts for upload.',
+        photosPermission: 'Lionrock uses your photo library so you can choose a receipt photo to upload.',
       },
     ],
   ],

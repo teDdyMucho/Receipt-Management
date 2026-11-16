@@ -11,10 +11,10 @@ export interface Identity {
   kind: IdentityKind;
   /** The access NAME, or the staff user name. Receipts are saved under this. */
   name: string;
-  /** Staff session token (staff only). */
-  token?: string;
-  /** False when the name was accepted without a server check (no API configured). */
-  verified: boolean;
+  /** Session token from the server, given after the right PIN or staff password. */
+  token: string;
+  /** Staff role (staff only). */
+  role?: string;
 }
 
 const IDENTITY_KEY = 'receipts.identity';
@@ -24,7 +24,9 @@ export async function loadIdentity(): Promise<Identity | null> {
   const raw = await SecureStore.getItem(IDENTITY_KEY);
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as Identity;
+    const identity = JSON.parse(raw) as Identity;
+    // An identity saved before PINs existed has no token: the person signs in again.
+    return identity.token ? identity : null;
   } catch {
     return null;
   }
@@ -54,4 +56,5 @@ interface Extra {
 const extra = (Constants.expoConfig?.extra ?? {}) as Extra;
 
 export const API_BASE_URL = (extra.apiBaseUrl ?? '').replace(/\/+$/, '');
-export const APP_VERSION = extra.appVersion ?? Constants.expoConfig?.version ?? '1.0.0';
+// The version in app.config.ts is the real one (it is what the stores show).
+export const APP_VERSION = Constants.expoConfig?.version ?? extra.appVersion ?? '1.0.0';

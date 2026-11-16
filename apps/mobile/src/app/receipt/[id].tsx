@@ -1,14 +1,17 @@
 import { formatReceiptDate, typeLabel } from '@lionrock/shared';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { StatusBadges } from '../../components/ReceiptCard';
 import { Button, Card } from '../../components/ui';
 import { deleteReceiptRow, getReceipt, listEvents, resetForRetry, subscribe, type LocalReceipt, type ReceiptEvent } from '../../lib/db';
 import { confirm } from '../../lib/dialog';
+import { uploadState } from '../../lib/status';
 import { syncReceipt } from '../../lib/sync';
 import { deleteReceiptFile, formatBytes, receiptFileUri } from '../../lib/files';
 import { colors, radius, space } from '../../lib/theme';
+import { openViewer } from '../../lib/viewer';
 
 // Receipt detail (spec 8.5): large preview, fields, status history, last error,
 // Retry and Delete.
@@ -57,13 +60,29 @@ export default function ReceiptDetail() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      {uri && isImage ? (
-        <Image source={{ uri }} resizeMode="contain" style={styles.preview} accessibilityLabel="Receipt" />
+      {/* Tapping the photo or the PDF opens it full screen. */}
+      {uri ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="View the receipt full screen"
+          onPress={() => openViewer({ title: receipt.file_name, contentType: receipt.content_type, uri, localPath: receipt.local_path })}
+        >
+          {isImage ? (
+            <Image source={{ uri }} resizeMode="contain" style={styles.preview} accessibilityLabel="Receipt" />
+          ) : (
+            <Card style={styles.noPreview}>
+              <Ionicons name="document-text-outline" size={44} color={colors.accent} />
+              <Text style={styles.pdfName}>{receipt.file_name}</Text>
+            </Card>
+          )}
+          <View style={styles.viewHint}>
+            <Ionicons name="expand-outline" size={16} color={colors.muted} />
+            <Text style={styles.viewHintText}>Tap to view full screen</Text>
+          </View>
+        </Pressable>
       ) : (
         <Card style={styles.noPreview}>
-          <Text style={styles.noPreviewText}>
-            {uri ? `PDF · ${receipt.file_name}` : 'This file was removed from this phone. The office has the copy.'}
-          </Text>
+          <Text style={styles.noPreviewText}>This file was removed from this phone. The office has the copy.</Text>
         </Card>
       )}
 
@@ -99,7 +118,7 @@ export default function ReceiptDetail() {
         ))}
       </Card>
 
-      {receipt.sync_status === 'failed' && <Button label="Retry" onPress={() => void resetForRetry(receipt.client_uuid).then(() => syncReceipt(receipt.client_uuid))} />}
+      {uploadState(receipt) === 'failed' && <Button label="Try again" icon="refresh" onPress={() => void resetForRetry(receipt.client_uuid).then(() => syncReceipt(receipt.client_uuid))} />}
       <Button label="Delete" variant="danger" onPress={() => void confirmDelete()} />
     </ScrollView>
   );
@@ -118,7 +137,10 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: space.lg, gap: space.lg },
   preview: { width: '100%', height: 420, backgroundColor: colors.card, borderRadius: radius },
-  noPreview: { alignItems: 'center', paddingVertical: space.xl * 2 },
+  noPreview: { alignItems: 'center', gap: space.sm, paddingVertical: space.xl * 1.5 },
+  pdfName: { color: colors.text, fontSize: 15, fontWeight: '600', textAlign: 'center' },
+  viewHint: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: space.sm },
+  viewHintText: { color: colors.muted, fontSize: 13 },
   noPreviewText: { color: colors.muted, fontSize: 15, textAlign: 'center' },
   card: { gap: space.sm },
   heading: { fontSize: 16, fontWeight: '700', color: colors.text },
