@@ -1,7 +1,7 @@
 import type { ExtractedFields } from '@lionrock/shared';
 import { getReceipt, saveExtracted } from './db';
 import { readReceiptBase64 } from './files';
-import { getServerBase, serverProblem } from './server';
+import { SERVER_HEADERS, getServerBase, serverProblem } from './server';
 
 // AI extraction (spec 4.9). Best effort: it never blocks saving, and if it
 // fails or takes over 20 seconds the wizard simply opens empty, with the reason shown.
@@ -32,7 +32,7 @@ export async function extractAndStore(clientUuid: string): Promise<ExtractOutcom
 
     const response = await fetch(`${server}/api/extract`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: SERVER_HEADERS,
       body: JSON.stringify({ contentType: receipt.content_type, base64 }),
       signal: controller.signal,
     });

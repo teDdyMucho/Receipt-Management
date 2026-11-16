@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import { addEvent, getReceipt, listReceipts, updateSync } from './db';
 import { readReceiptBase64 } from './files';
 import { APP_VERSION, getDeviceId } from './identity';
-import { getServerBase, serverProblem } from './server';
+import { SERVER_HEADERS, getServerBase, serverProblem } from './server';
 
 // Sends receipts to the server. A receipt becomes Synced on this device only
 // after the server confirms it with the same checksum (spec 4.5).
@@ -37,7 +37,7 @@ export async function syncReceipt(clientUuid: string): Promise<boolean> {
 
     const response = await fetch(`${server}/api/receipts/save`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: SERVER_HEADERS,
       body: JSON.stringify({
         client_uuid: receipt.client_uuid,
         identity: receipt.identity,

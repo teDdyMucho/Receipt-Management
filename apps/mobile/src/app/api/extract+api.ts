@@ -1,9 +1,12 @@
 import { ExtractError, extractReceipt } from '../../server/extractReceipt';
+import { rejectWithoutAppKey } from '../../server/guard';
 
 // POST /api/extract  { contentType, base64 }  ->  { extracted_fields }
 // Runs on the server (never in the app bundle). In production this moves behind
 // the identity check as POST /api/receipts/{client_uuid}/extract.
 export async function POST(request: Request): Promise<Response> {
+  const rejected = rejectWithoutAppKey(request);
+  if (rejected) return rejected;
   try {
     const body = (await request.json().catch(() => null)) as { contentType?: string; base64?: string } | null;
     if (!body?.contentType || !body.base64) {

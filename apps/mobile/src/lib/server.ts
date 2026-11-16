@@ -8,6 +8,12 @@ import { API_BASE_URL } from './identity';
 
 const KEY = 'server_url';
 
+/** Headers for every call to our server. The app key is public by design (see src/server/guard.ts). */
+export const SERVER_HEADERS: Record<string, string> = {
+  'Content-Type': 'application/json',
+  ...(process.env.EXPO_PUBLIC_APP_KEY ? { 'X-App-Key': process.env.EXPO_PUBLIC_APP_KEY } : {}),
+};
+
 export function cleanServerUrl(input: string): string {
   let url = input.trim().replace(/\/+$/, '');
   if (url && !/^https?:\/\//i.test(url)) url = `http://${url}`;
@@ -39,7 +45,7 @@ export async function testServer(base: string): Promise<{ ok: boolean; message: 
     // An empty request must come back as a JSON "bad request" from our route.
     const res = await fetch(`${base}/api/extract`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: SERVER_HEADERS,
       body: '{}',
       signal: controller.signal,
     });

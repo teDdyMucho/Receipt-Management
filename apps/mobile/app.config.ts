@@ -13,6 +13,8 @@ const config: ExpoConfig = {
     supportsTablet: true,
     bundleIdentifier: 'com.lionrock.receipts',
     infoPlist: {
+      // The app uses only standard https encryption, so no export paperwork is needed.
+      ITSAppUsesNonExemptEncryption: false,
       NSCameraUsageDescription: 'Receipts uses the camera to photograph receipts for upload.',
       NSPhotoLibraryUsageDescription: 'Receipts uses your photo library so you can choose a receipt photo to upload.',
     },
@@ -47,6 +49,7 @@ const config: ExpoConfig = {
   extra: {
     apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL ?? '',
     appVersion: process.env.EXPO_PUBLIC_APP_VERSION ?? '1.0.0',
+    eas: { projectId: '46ea388b-f184-4e68-9445-80db13df9941' },
   },
 };
 
