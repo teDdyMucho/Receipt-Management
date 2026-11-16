@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Redirect } from 'expo-router';
 import { Tabs } from 'expo-router/js-tabs';
 import React from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, Platform, Text, View } from 'react-native';
 import { useSession } from '../../lib/session';
 import { colors } from '../../lib/theme';
 
@@ -28,8 +28,10 @@ export default function TabsLayout() {
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.muted,
-        tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
-        tabBarStyle: { backgroundColor: colors.card, borderTopColor: colors.border },
+        // Our own label: the built-in one is cut off at the bottom in a browser.
+        tabBarLabel: ({ color, children }) => <Text style={{ fontSize: 12, fontWeight: '600', lineHeight: 16, color }}>{children}</Text>,
+        // In a browser the default bar is too short and cuts the labels off; phones size it themselves.
+        tabBarStyle: { backgroundColor: colors.card, borderTopColor: colors.border, ...(Platform.OS === 'web' ? { height: 66, paddingTop: 6, paddingBottom: 10 } : {}) },
         headerStyle: { backgroundColor: colors.bg },
         headerShadowVisible: false,
         headerTitleStyle: { fontSize: 20, fontWeight: '800', color: colors.text },

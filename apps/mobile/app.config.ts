@@ -50,7 +50,7 @@ const config: ExpoConfig = {
   ],
   extra: {
     apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL ?? '',
-    appVersion: process.env.EXPO_PUBLIC_APP_VERSION ?? '1.0.0',
+    appVersion: '2.0.0',
     eas: { projectId: '46ea388b-f184-4e68-9445-80db13df9941' },
   },
 };

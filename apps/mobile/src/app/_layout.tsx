@@ -20,6 +20,7 @@ export default function RootLayout() {
         <Stack.Screen name="receipt/[id]" options={{ title: 'Receipt' }} />
         <Stack.Screen name="edit/[id]" options={{ title: 'Edit receipt', presentation: 'modal' }} />
         <Stack.Screen name="camera" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />
+        <Stack.Screen name="privacy" options={{ headerShown: false, title: 'Privacy Policy' }} />
         <Stack.Screen name="receipt-management" options={{ headerShown: false }} />
       </Stack>
       </View>
