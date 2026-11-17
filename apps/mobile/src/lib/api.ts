@@ -67,6 +67,9 @@ export const setProfileImage = (profile_image: string | null) =>
 export const changePin = (current_pin: string, new_pin: string) =>
   call<{ ok: boolean }>('/api/access/pin', { body: { current_pin, new_pin }, signedIn: true });
 
+/** Deletes the signed-in link account for good. The PIN is checked again. */
+export const deleteMyAccount = (pin: string) => call<{ ok: boolean }>('/api/access/delete', { body: { pin }, signedIn: true });
+
 export interface StaffAccount {
   id: string;
   email: string;

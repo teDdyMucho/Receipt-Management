@@ -51,7 +51,8 @@ const SECTIONS: { title: string; body: string[] }[] = [
   {
     title: 'Your choices',
     body: [
-      'You can change your profile picture and your PIN in Settings. To have your account closed or your information removed, ask the Lion Rock Property Management office.',
+      'You can change your profile picture and your PIN in Settings.',
+      'You can delete your account yourself at any time: open Settings and tap "Delete my account". Your PIN and picture are erased and the account is closed for good. Staff accounts are closed by the Lion Rock Property Management office on request.',
       'The app asks for the camera only to photograph receipts, and for your photos only when you choose a picture.',
     ],
   },

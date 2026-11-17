@@ -9,6 +9,7 @@ import { getSetting, setSetting } from '../lib/db';
 import { confirm, showMessage } from '../lib/dialog';
 import { useSession } from '../lib/session';
 import { colors, space } from '../lib/theme';
+import { DeleteAccountCard } from './DeleteAccountCard';
 import { PinInput, isPin } from './PinInput';
 import { ThisPhoneCard } from './ThisPhoneCard';
 import { Button, Card, SectionTitle } from './ui';
@@ -178,6 +179,8 @@ export function ProfileSettings() {
       <ThisPhoneCard />
 
       <Button label="Sign out" icon="log-out-outline" variant="secondary" onPress={leave} />
+
+      <DeleteAccountCard />
     </ScrollView>
   );
 }

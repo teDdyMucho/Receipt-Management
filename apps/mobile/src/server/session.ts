@@ -1,3 +1,4 @@
+import { rows } from './admin';
 import { HttpError } from './http';
 
 // SERVER ONLY. Signed session tokens. After a correct PIN (or staff password)
@@ -82,5 +83,11 @@ export async function requireSession(request: Request, kind?: SessionUser['kind'
   const user = await readSession(request);
   if (!user) throw new HttpError('Please sign in again.', 401, 'signed_out');
   if (kind && user.kind !== kind) throw new HttpError('This is not allowed for your account.', 403, 'forbidden');
+  // A link account that was deleted or switched off stops working at once, even with an old token.
+  if (user.kind === 'access') {
+    const key = user.name.trim().replace(/\s+/g, ' ').toLowerCase();
+    const account = (await rows<{ disabled_at: string | null }>(`/rest/v1/receipt_link_accounts?name_key=eq.${encodeURIComponent(key)}&select=disabled_at`))[0];
+    if (!account || account.disabled_at) throw new HttpError('Please sign in again.', 401, 'signed_out');
+  }
   return user;
 }

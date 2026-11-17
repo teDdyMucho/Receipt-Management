@@ -168,6 +168,27 @@ export async function changePin(user: SessionUser, currentInput: unknown, nextIn
   return { ok: true };
 }
 
+/**
+ * The person deletes their own account from inside the app (the app stores ask for this).
+ * The PIN and the picture are erased and nobody can sign in with the name again.
+ * The name itself stays reserved: receipts are filed under it, so letting someone
+ * else take the name would hand them the previous person's receipts.
+ */
+export async function deleteAccount(user: SessionUser, pinInput: unknown) {
+  const account = await ownAccount(user);
+  if (typeof pinInput !== 'string' || !pinInput) throw new HttpError('Enter your PIN.', 400, 'bad_pin');
+  await verifyPin(account, pinInput);
+  await patch(account.name_key, {
+    pin_hash: '',
+    pin_salt: '',
+    profile_image: null,
+    pin_failed_count: 0,
+    pin_locked_until: null,
+    disabled_at: new Date().toISOString(),
+  });
+  return { ok: true };
+}
+
 /** `image` is a small JPEG or PNG as a data URL, or null to remove the picture. */
 export async function setProfileImage(user: SessionUser, image: unknown) {
   const account = await ownAccount(user);
